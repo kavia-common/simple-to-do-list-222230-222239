@@ -39,6 +39,15 @@ export default function App() {
   // filter: 'all' | 'active' | 'completed'
   const [filter, setFilter] = useState('all');
 
+  // announcements for screen readers
+  const liveRef = useRef(null);
+  const announce = useCallback((msg) => {
+    // Update aria-live region text content to announce changes
+    if (liveRef.current) {
+      liveRef.current.textContent = msg;
+    }
+  }, []);
+
   // Optional theme preference via prefers-color-scheme, but keep app bright and oceanic by default
   const [preferredDark] = useState(
     () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -59,9 +68,16 @@ export default function App() {
   // Accessible handlers
   const addTask = useCallback((text) => {
     const trimmed = (text || '').trim();
-    if (!trimmed) return;
-    setTasks((prev) => [{ id: uid(), text: trimmed, completed: false }, ...prev]);
-  }, []);
+    if (!trimmed) {
+      announce('Cannot add an empty task');
+      return;
+    }
+    setTasks((prev) => {
+      const next = [{ id: uid(), text: trimmed, completed: false }, ...prev];
+      return next;
+    });
+    announce(`Added task: ${trimmed}`);
+  }, [announce]);
 
   const toggleTask = useCallback((id) => {
     setTasks((prev) =>
@@ -70,18 +86,39 @@ export default function App() {
   }, []);
 
   const deleteTask = useCallback((id) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    setTasks((prev) => {
+      const task = prev.find(t => t.id === id);
+      const next = prev.filter((t) => t.id !== id);
+      // announce after removal for correctness
+      announce(`Deleted task${task?.text ? `: ${task.text}` : ''}`);
+      return next;
+    });
+  }, [announce]);
 
   const editTask = useCallback((id, newText) => {
     const trimmed = (newText || '').trim();
-    if (!trimmed) return; // do not commit empty edits
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, text: trimmed } : t)));
-  }, []);
+    if (!trimmed) {
+      announce('Edit cancelled. Empty value not saved.');
+      return; // do not commit empty edits
+    }
+    setTasks((prev) => {
+      const prevTask = prev.find(t => t.id === id);
+      const next = prev.map((t) => (t.id === id ? { ...t, text: trimmed } : t));
+      if (prevTask && prevTask.text !== trimmed) {
+        announce(`Edited task: ${trimmed}`);
+      }
+      return next;
+    });
+  }, [announce]);
 
   const clearCompleted = useCallback(() => {
-    setTasks((prev) => prev.filter((t) => !t.completed));
-  }, []);
+    setTasks((prev) => {
+      const removed = prev.filter((t) => t.completed).length;
+      const next = prev.filter((t) => !t.completed);
+      announce(removed > 0 ? `Cleared ${removed} completed task${removed > 1 ? 's' : ''}` : 'No completed tasks to clear');
+      return next;
+    });
+  }, [announce]);
 
   const remainingCount = useMemo(() => tasks.filter((t) => !t.completed).length, [tasks]);
   const completedCount = useMemo(() => tasks.filter((t) => t.completed).length, [tasks]);
@@ -94,6 +131,13 @@ export default function App() {
 
   const onSetFilter = useCallback((val) => setFilter(val), []);
 
+  // Per-filter empty messages
+  const emptyMessages = {
+    all: 'Your list is clear. Add a task to get started.',
+    active: 'No active tasks. Enjoy the calm seas!',
+    completed: 'No completed tasks yet. Mark tasks as done to see them here.'
+  };
+
   return (
     <div className={`ocean-app ${preferredDark ? 'prefers-dark' : ''}`}>
       <GradientBackground />
@@ -105,13 +149,22 @@ export default function App() {
           <p className="subtitle">Stay organized with a clean, modern list.</p>
         </header>
 
+        {/* aria-live polite region for announcements */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only" ref={liveRef} />
+
         <TaskInput onAdd={addTask} />
 
-        <Filters filter={filter} setFilter={onSetFilter} remaining={remainingCount} completed={completedCount} onClearCompleted={clearCompleted} />
+        <Filters
+          filter={filter}
+          setFilter={onSetFilter}
+          remaining={remainingCount}
+          completed={completedCount}
+          onClearCompleted={clearCompleted}
+        />
 
         <section className="card" aria-label="Task list">
           {filteredTasks.length === 0 ? (
-            <EmptyState />
+            <EmptyState message={emptyMessages[filter]} />
           ) : (
             <>
               <TaskList
@@ -147,11 +200,11 @@ function FooterNote() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ message = 'Your list is clear. Add a task to get started.' }) {
   return (
     <div className="empty-state" role="status" aria-live="polite">
       <span className="empty-emoji" aria-hidden="true">🌊</span>
-      <p className="empty-text">Your list is clear. Add a task to get started.</p>
+      <p className="empty-text">{message}</p>
     </div>
   );
 }
@@ -161,7 +214,8 @@ function TaskInput({ onAdd }) {
   const inputRef = useRef(null);
 
   const submit = useCallback(() => {
-    onAdd(value);
+    const text = (value || '').trim();
+    onAdd(text);
     setValue('');
     // return focus to input for fast entry
     inputRef.current?.focus();
@@ -221,6 +275,7 @@ function Filters({ filter, setFilter, remaining, completed, onClearCompleted }) 
               className={`filter-btn ${filter === b.id ? 'selected' : ''}`}
               aria-pressed={filter === b.id}
               onClick={() => setFilter(b.id)}
+              aria-label={`Show ${b.label.toLowerCase()} tasks`}
             >
               {b.label}
             </button>

@@ -122,6 +122,11 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -262,6 +267,12 @@ body {
   cursor: pointer;
 }
 
+.task-item input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+  border-radius: 4px;
+}
+
 .task-text {
   font-size: 16px;
   color: var(--text);
@@ -269,6 +280,12 @@ body {
   display: inline-block;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+
+.task-text:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+  border-radius: 6px;
 }
 
 .task-text.completed {
@@ -315,6 +332,11 @@ body {
 .icon-btn:hover {
   background: rgba(17, 24, 39, 0.06);
   color: var(--error);
+}
+
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
 }
 
 .delete-btn {
