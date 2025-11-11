@@ -23,6 +23,8 @@ export default function App() {
    * - Lists tasks
    * - Toggles completion
    * - Deletes tasks
+   * - Filters tasks
+   * - Inline edit
    * Tasks are persisted to localStorage.
    */
   const [tasks, setTasks] = useState(() => {
@@ -33,6 +35,9 @@ export default function App() {
       return [];
     }
   });
+
+  // filter: 'all' | 'active' | 'completed'
+  const [filter, setFilter] = useState('all');
 
   // Optional theme preference via prefers-color-scheme, but keep app bright and oceanic by default
   const [preferredDark] = useState(
@@ -68,7 +73,26 @@ export default function App() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const editTask = useCallback((id, newText) => {
+    const trimmed = (newText || '').trim();
+    if (!trimmed) return; // do not commit empty edits
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, text: trimmed } : t)));
+  }, []);
+
+  const clearCompleted = useCallback(() => {
+    setTasks((prev) => prev.filter((t) => !t.completed));
+  }, []);
+
   const remainingCount = useMemo(() => tasks.filter((t) => !t.completed).length, [tasks]);
+  const completedCount = useMemo(() => tasks.filter((t) => t.completed).length, [tasks]);
+
+  const filteredTasks = useMemo(() => {
+    if (filter === 'active') return tasks.filter((t) => !t.completed);
+    if (filter === 'completed') return tasks.filter((t) => t.completed);
+    return tasks;
+  }, [tasks, filter]);
+
+  const onSetFilter = useCallback((val) => setFilter(val), []);
 
   return (
     <div className={`ocean-app ${preferredDark ? 'prefers-dark' : ''}`}>
@@ -83,14 +107,23 @@ export default function App() {
 
         <TaskInput onAdd={addTask} />
 
+        <Filters filter={filter} setFilter={onSetFilter} remaining={remainingCount} completed={completedCount} onClearCompleted={clearCompleted} />
+
         <section className="card" aria-label="Task list">
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <EmptyState />
           ) : (
             <>
-              <TaskList tasks={tasks} onToggle={toggleTask} onDelete={deleteTask} />
+              <TaskList
+                tasks={filteredTasks}
+                onToggle={toggleTask}
+                onDelete={deleteTask}
+                onEdit={editTask}
+              />
               <footer className="list-footer" aria-live="polite">
-                {remainingCount === 0 ? 'All tasks completed. Great job!' : `${remainingCount} task${remainingCount > 1 ? 's' : ''} remaining`}
+                {remainingCount === 0
+                  ? 'All tasks completed. Great job!'
+                  : `${remainingCount} task${remainingCount > 1 ? 's' : ''} remaining`}
               </footer>
             </>
           )}
@@ -170,22 +203,125 @@ function TaskInput({ onAdd }) {
   );
 }
 
-function TaskList({ tasks, onToggle, onDelete }) {
+function Filters({ filter, setFilter, remaining, completed, onClearCompleted }) {
+  const buttons = [
+    { id: 'all', label: 'All' },
+    { id: 'active', label: 'Active' },
+    { id: 'completed', label: 'Completed' },
+  ];
+
+  return (
+    <div className="card filters-card" role="region" aria-label="Filters">
+      <div className="filters-row">
+        <div className="btn-group" role="group" aria-label="Filter tasks">
+          {buttons.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className={`filter-btn ${filter === b.id ? 'selected' : ''}`}
+              aria-pressed={filter === b.id}
+              onClick={() => setFilter(b.id)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+        <div className="filters-meta">
+          <span aria-live="polite" className="remaining-label">
+            {remaining} left
+          </span>
+          {completed > 0 && (
+            <button
+              type="button"
+              className="clear-btn"
+              onClick={onClearCompleted}
+              aria-label="Clear completed tasks"
+            >
+              Clear completed
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskList({ tasks, onToggle, onDelete, onEdit }) {
   return (
     <ul className="task-list" role="list">
       {tasks.map((task) => (
-        <TaskItem key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} />
+        <TaskItem
+          key={task.id}
+          task={task}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onEdit={onEdit}
+        />
       ))}
     </ul>
   );
 }
 
-function TaskItem({ task, onToggle, onDelete }) {
+const TaskItem = React.memo(function TaskItem({ task, onToggle, onDelete, onEdit }) {
   const { id, text, completed } = task;
-  const onKeyDown = (e) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const editInputRef = useRef(null);
+  const editButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing) {
+      // focus the input when entering edit mode
+      editInputRef.current?.focus();
+      editInputRef.current?.select();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    // keep draft in sync if text changes externally
+    setDraft(text);
+  }, [text]);
+
+  const enterEdit = useCallback(() => setIsEditing(true), []);
+  const exitEdit = useCallback(() => setIsEditing(false), []);
+
+  const commitEdit = useCallback(() => {
+    const trimmed = (draft || '').trim();
+    if (!trimmed) {
+      // do not commit empty changes, just exit and keep original
+      setDraft(text);
+      exitEdit();
+      // return focus to edit button if available
+      editButtonRef.current?.focus();
+      return;
+    }
+    if (trimmed !== text) {
+      onEdit(id, trimmed);
+    }
+    exitEdit();
+    editButtonRef.current?.focus();
+  }, [draft, text, onEdit, id, exitEdit]);
+
+  const cancelEdit = useCallback(() => {
+    setDraft(text);
+    exitEdit();
+    editButtonRef.current?.focus();
+  }, [text, exitEdit]);
+
+  const onLabelKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onToggle(id);
+    }
+  };
+
+  const onEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
     }
   };
 
@@ -200,20 +336,46 @@ function TaskItem({ task, onToggle, onDelete }) {
           aria-checked={completed}
           aria-label={`Mark "${text}" as ${completed ? 'incomplete' : 'complete'}`}
         />
-        <label
-          htmlFor={`cb-${id}`}
-          className={`task-text ${completed ? 'completed' : ''}`}
-          tabIndex={0}
-          onKeyDown={onKeyDown}
-          aria-describedby={`status-${id}`}
-        >
-          {text}
-        </label>
+        {!isEditing ? (
+          <label
+            htmlFor={`cb-${id}`}
+            className={`task-text ${completed ? 'completed' : ''}`}
+            tabIndex={0}
+            onKeyDown={onLabelKeyDown}
+            aria-describedby={`status-${id}`}
+            onClick={enterEdit}
+            title="Click to edit"
+          >
+            {text}
+          </label>
+        ) : (
+          <input
+            ref={editInputRef}
+            className="edit-input"
+            aria-label="Edit task"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onEditKeyDown}
+            onBlur={commitEdit}
+          />
+        )}
         <span id={`status-${id}`} className="sr-only">
           {completed ? 'Completed' : 'Active'}
         </span>
       </div>
       <div className="right">
+        {!isEditing && (
+          <button
+            ref={editButtonRef}
+            type="button"
+            className="icon-btn"
+            onClick={enterEdit}
+            aria-label={`Edit task "${text}"`}
+            title="Edit"
+          >
+            ✎
+          </button>
+        )}
         <button
           type="button"
           className="icon-btn delete-btn"
@@ -226,4 +388,4 @@ function TaskItem({ task, onToggle, onDelete }) {
       </div>
     </li>
   );
-}
+});
