@@ -4,79 +4,66 @@ This project provides a minimal React template with a clean, modern UI and minim
 
 ## Features
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
+- Lightweight: vanilla CSS + React only
+- Modern UI: Clean, responsive design with KAVIA styling
+- Fast: Minimal dependencies
+- Simple: Easy to understand and modify
 
 ## Getting Started
 
 In the project directory, you can run:
 
-### `npm start`
+- `npm start` — start in development mode
+- `npm test` — run tests in watch mode
+- `npm run build` — build for production
 
-Runs the app in development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Open http://localhost:3000 in your browser when running locally.
 
-### `npm test`
+## Environment Variables
 
-Launches the test runner in interactive watch mode.
+This is a frontend-only app. It does not call a backend and therefore does not use most environment variables.
 
-### `npm run build`
+- Unused in this app:
+  - REACT_APP_API_BASE
+  - REACT_APP_BACKEND_URL
+  - REACT_APP_FRONTEND_URL
+  - REACT_APP_WS_URL
+  - REACT_APP_NODE_ENV
+  - REACT_APP_NEXT_TELEMETRY_DISABLED
+  - REACT_APP_ENABLE_SOURCE_MAPS
+  - REACT_APP_PORT
+  - REACT_APP_TRUST_PROXY
+  - REACT_APP_HEALTHCHECK_PATH
+  - REACT_APP_FEATURE_FLAGS
+  - REACT_APP_EXPERIMENTS_ENABLED
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Used by this app:
+  - REACT_APP_LOG_LEVEL
+    - Purpose: Optional debug logging.
+    - Behavior: When set to `debug` and the app runs in development mode (NODE_ENV=development), the UI emits debug logs to the browser console from key lifecycle and action points.
+    - Production builds never output these debug logs.
+
+Example usage:
+- Development with debug logs:
+  - macOS/Linux: `REACT_APP_LOG_LEVEL=debug npm start`
+  - Windows (PowerShell): `$env:REACT_APP_LOG_LEVEL="debug"; npm start`
+
+To disable logs, omit the variable or set it to any value other than `debug`.
+
+Note: Do not add secrets or sensitive values to REACT_APP_* variables. They are embedded in the client bundle at build time.
 
 ## Customization
 
-### Colors
-
-The main brand colors are defined as CSS variables in `src/App.css`:
-
-```css
-:root {
-  --kavia-orange: #E87A41;
-  --kavia-dark: #1A1A1A;
-  --text-color: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-}
-```
-
-### Components
-
-This template uses pure HTML/CSS components instead of a UI framework. You can find component styles in `src/App.css`. 
-
-Common components include:
-- Buttons (`.btn`, `.btn-large`)
-- Container (`.container`)
-- Navigation (`.navbar`)
-- Typography (`.title`, `.subtitle`, `.description`)
+- Colors: Defined as CSS variables in `src/App.css` under the Ocean Professional theme.
+- Components: Pure HTML/CSS components with styles in `src/App.css`.
 
 ## Learn More
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- React docs: https://reactjs.org/
+- CRA guides:
+  - Code Splitting: https://facebook.github.io/create-react-app/docs/code-splitting
+  - Bundle Analysis: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
+  - PWA: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
+  - Advanced Config: https://facebook.github.io/create-react-app/docs/advanced-configuration
+  - Deployment: https://facebook.github.io/create-react-app/docs/deployment
+  - Troubleshooting: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify

@@ -3,6 +3,23 @@ import './App.css';
 import './index.css';
 
 /**
+ * Minimal debug logger enabled only when:
+ * - process.env.NODE_ENV === 'development'
+ * - process.env.REACT_APP_LOG_LEVEL === 'debug'
+ * This keeps production builds clean and avoids leaking env info.
+ */
+const __DEV_DEBUG__ =
+  process.env.NODE_ENV === 'development' &&
+  String(process.env.REACT_APP_LOG_LEVEL || '').toLowerCase() === 'debug';
+
+const dlog = (...args) => {
+  if (__DEV_DEBUG__) {
+    // eslint-disable-next-line no-console
+    console.debug('[App]', ...args);
+  }
+};
+
+/**
  * Ocean Professional Theme Tokens (kept in JS for easy reference)
  * primary: #2563EB (blue-600)
  * secondary/success: #F59E0B (amber-500)
@@ -30,8 +47,11 @@ export default function App() {
   const [tasks, setTasks] = useState(() => {
     try {
       const raw = localStorage.getItem('tasks');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
+      const initial = raw ? JSON.parse(raw) : [];
+      dlog('Loaded tasks from localStorage', initial);
+      return initial;
+    } catch (e) {
+      dlog('Failed to parse tasks from localStorage', e);
       return [];
     }
   });
@@ -44,21 +64,22 @@ export default function App() {
     const raw = (window.location.hash || '').toLowerCase();
     // accepted patterns: #/all, #/active, #/completed, also tolerate '#all'
     const cleaned = raw.replace(/^#\/?/, '');
-    if (cleaned === 'active' || cleaned === 'completed' || cleaned === 'all') {
-      return cleaned;
-    }
-    return 'all';
+    const val = (cleaned === 'active' || cleaned === 'completed' || cleaned === 'all') ? cleaned : 'all';
+    dlog('parseHash', { raw, cleaned, val });
+    return val;
   }, []);
 
   // Initialize filter from hash on mount and subscribe to hashchange
   useEffect(() => {
     // initialize from current hash
     const initial = parseHash();
+    dlog('Initial filter from hash', initial);
     setFilter(initial);
 
     // listener to sync state when user navigates back/forward
     const onHashChange = () => {
       const next = parseHash();
+      dlog('hashchange -> next filter', next);
       setFilter((prev) => (prev !== next ? next : prev));
     };
     window.addEventListener('hashchange', onHashChange);
@@ -70,6 +91,7 @@ export default function App() {
 
   // When filter changes by UI, update the hash (and announce)
   const setFilterAndHash = useCallback((val) => {
+    dlog('setFilterAndHash', val);
     setFilter(val);
     const target = `#/${val}`;
     if (window.location.hash !== target) {
@@ -95,13 +117,16 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('tasks', JSON.stringify(tasks));
-    } catch {
+      dlog('Persisted tasks to localStorage', tasks);
+    } catch (e) {
+      dlog('Failed persisting tasks', e);
       // ignore storage errors
     }
   }, [tasks]);
 
   useEffect(() => {
     document.title = 'Ocean To‑Do';
+    dlog('Document title set');
   }, []);
 
   // Accessible handlers
@@ -109,22 +134,27 @@ export default function App() {
     const trimmed = (text || '').trim();
     if (!trimmed) {
       announce('Cannot add an empty task');
+      dlog('addTask blocked: empty');
       return;
     }
     setTasks((prev) => {
-      const next = [{ id: uid(), text: trimmed, completed: false }, ...prev];
+      const newTask = { id: uid(), text: trimmed, completed: false };
+      const next = [newTask, ...prev];
+      dlog('addTask', newTask);
       return next;
     });
     announce(`Added task: ${trimmed}`);
   }, [announce]);
 
   const toggleTask = useCallback((id) => {
+    dlog('toggleTask', id);
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
     );
   }, []);
 
   const deleteTask = useCallback((id) => {
+    dlog('deleteTask', id);
     setTasks((prev) => {
       const task = prev.find(t => t.id === id);
       const next = prev.filter((t) => t.id !== id);
@@ -138,12 +168,14 @@ export default function App() {
     const trimmed = (newText || '').trim();
     if (!trimmed) {
       announce('Edit cancelled. Empty value not saved.');
+      dlog('editTask cancelled: empty', id);
       return; // do not commit empty edits
     }
     setTasks((prev) => {
       const prevTask = prev.find(t => t.id === id);
       const next = prev.map((t) => (t.id === id ? { ...t, text: trimmed } : t));
       if (prevTask && prevTask.text !== trimmed) {
+        dlog('editTask', { id, from: prevTask.text, to: trimmed });
         announce(`Edited task: ${trimmed}`);
       }
       return next;
@@ -154,18 +186,30 @@ export default function App() {
     setTasks((prev) => {
       const removed = prev.filter((t) => t.completed).length;
       const next = prev.filter((t) => !t.completed);
+      dlog('clearCompleted', { removed });
       announce(removed > 0 ? `Cleared ${removed} completed task${removed > 1 ? 's' : ''}` : 'No completed tasks to clear');
       return next;
     });
   }, [announce]);
 
-  const remainingCount = useMemo(() => tasks.filter((t) => !t.completed).length, [tasks]);
-  const completedCount = useMemo(() => tasks.filter((t) => t.completed).length, [tasks]);
+  const remainingCount = useMemo(() => {
+    const n = tasks.filter((t) => !t.completed).length;
+    dlog('remainingCount', n);
+    return n;
+  }, [tasks]);
+
+  const completedCount = useMemo(() => {
+    const n = tasks.filter((t) => t.completed).length;
+    dlog('completedCount', n);
+    return n;
+  }, [tasks]);
 
   const filteredTasks = useMemo(() => {
-    if (filter === 'active') return tasks.filter((t) => !t.completed);
-    if (filter === 'completed') return tasks.filter((t) => t.completed);
-    return tasks;
+    let list = tasks;
+    if (filter === 'active') list = tasks.filter((t) => !t.completed);
+    else if (filter === 'completed') list = tasks.filter((t) => t.completed);
+    dlog('filteredTasks', { filter, count: list.length });
+    return list;
   }, [tasks, filter]);
 
   const onSetFilter = useCallback((val) => setFilterAndHash(val), [setFilterAndHash]);
