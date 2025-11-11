@@ -39,6 +39,45 @@ export default function App() {
   // filter: 'all' | 'active' | 'completed'
   const [filter, setFilter] = useState('all');
 
+  // Parse hash to filter value
+  const parseHash = useCallback(() => {
+    const raw = (window.location.hash || '').toLowerCase();
+    // accepted patterns: #/all, #/active, #/completed, also tolerate '#all'
+    const cleaned = raw.replace(/^#\/?/, '');
+    if (cleaned === 'active' || cleaned === 'completed' || cleaned === 'all') {
+      return cleaned;
+    }
+    return 'all';
+  }, []);
+
+  // Initialize filter from hash on mount and subscribe to hashchange
+  useEffect(() => {
+    // initialize from current hash
+    const initial = parseHash();
+    setFilter(initial);
+
+    // listener to sync state when user navigates back/forward
+    const onHashChange = () => {
+      const next = parseHash();
+      setFilter((prev) => (prev !== next ? next : prev));
+    };
+    window.addEventListener('hashchange', onHashChange);
+
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+    };
+  }, [parseHash]);
+
+  // When filter changes by UI, update the hash (and announce)
+  const setFilterAndHash = useCallback((val) => {
+    setFilter(val);
+    const target = `#/${val}`;
+    if (window.location.hash !== target) {
+      // update hash without adding an extra entry if already same path except case
+      window.location.hash = target;
+    }
+  }, []);
+
   // announcements for screen readers
   const liveRef = useRef(null);
   const announce = useCallback((msg) => {
@@ -129,7 +168,7 @@ export default function App() {
     return tasks;
   }, [tasks, filter]);
 
-  const onSetFilter = useCallback((val) => setFilter(val), []);
+  const onSetFilter = useCallback((val) => setFilterAndHash(val), [setFilterAndHash]);
 
   // Per-filter empty messages
   const emptyMessages = {
